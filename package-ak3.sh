@@ -11,6 +11,8 @@
 #   -d, --download        Clone the official AnyKernel3 template if needed
 #   -o, --output PATH     Output zip path
 #                         (default: Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip)
+#   -D, --device NAME     Set device.name1 in anykernel.sh and name the output
+#                         zip after the device (e.g. -D sagit -> Sagit-...zip)
 #   --no-kernel-string    Do not rewrite kernel.string in anykernel.sh
 #   -h, --help            Show this help
 #
@@ -25,7 +27,9 @@ SUBMODULE="$REPO_DIR/ReSukiSU"
 IMAGE="$REPO_DIR/out/arch/arm64/boot/Image.gz-dtb"
 TEMPLATE=""
 DOWNLOAD=0
-OUT="$REPO_DIR/Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip"
+OUT=""
+DEVICE=""
+OUT_SPECIFIED=0
 UPDATE_STRING=1
 MIN_VERSION=34634
 
@@ -36,7 +40,8 @@ while [ "$#" -gt 0 ]; do
         -i|--image) shift; IMAGE="$1" ;;
         -t|--template) shift; TEMPLATE="$1" ;;
         -d|--download) DOWNLOAD=1 ;;
-        -o|--output) shift; OUT="$1" ;;
+        -o|--output) shift; OUT="$1"; OUT_SPECIFIED=1 ;;
+        -D|--device) shift; DEVICE="$1" ;;
         --no-kernel-string) UPDATE_STRING=0 ;;
         -h|--help) usage 0 ;;
         *) echo "unknown option: $1" >&2; usage 1 ;;
@@ -44,6 +49,14 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
+if [ -z "$OUT" ]; then
+    if [ -n "$DEVICE" ]; then
+        CAP="$(printf '%s' "$DEVICE" | cut -c1 | tr '[:lower:]' '[:upper:]')$(printf '%s' "$DEVICE" | cut -c2-)"
+        OUT="$REPO_DIR/${CAP}-ReSukiSU-Lineage22.2-AnyKernel3.zip"
+    else
+        OUT="$REPO_DIR/Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip"
+    fi
+fi
 case "$OUT" in
     /*) ;;
     *) OUT="$REPO_DIR/$OUT" ;;
@@ -126,6 +139,10 @@ cp -f "$IMAGE" "$TEMPLATE/Image.gz-dtb"
 
 if [ "$UPDATE_STRING" -eq 1 ] && [ -f "$TEMPLATE/anykernel.sh" ]; then
     STRING="Chiron-ReSukiSU ${SHORT} (${VERSION}) 4.4.302-perf-resukisu for LineageOS 22.2"
+    if [ -n "$DEVICE" ] && grep -q '^device.name1=' "$TEMPLATE/anykernel.sh"; then
+        sed -i "s|^device.name1=.*|device.name1=${DEVICE}|" "$TEMPLATE/anykernel.sh"
+        echo "[package] device.name1=$DEVICE"
+    fi
     if grep -q '^kernel.string=' "$TEMPLATE/anykernel.sh"; then
         sed -i "s|^kernel.string=.*|kernel.string=${STRING}|" "$TEMPLATE/anykernel.sh"
         echo "[package] kernel.string=$STRING"
