@@ -34,6 +34,19 @@ make O=out -j"$(nproc)" Image.gz-dtb modules
 
 Or simply run `./build.sh`.
 
+## One-click scripts
+
+- `./update-resukisu.sh` - update ReSukiSU to latest `main`, commit, rebuild
+  (and optionally repackage with `--ak3 DIR`)
+- `./build-resukisu.sh` - one-click build of `out/arch/arm64/boot/Image.gz-dtb`
+  (checks toolchains, generates config, verifies ReSukiSU manual hooks)
+- `./package-ak3.sh` - one-click packaging of the built kernel into
+  `Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip`
+  (auto-extracts the existing zip as AnyKernel3 template, or use `-t DIR` /
+  `-d` to clone the official template)
+
+Typical flow: `./update-resukisu.sh` -> `./build-resukisu.sh` -> `./package-ak3.sh`.
+
 ## Output
 
 - Kernel image: `out/arch/arm64/boot/Image.gz-dtb`
