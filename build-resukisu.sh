@@ -88,10 +88,10 @@ make O=out -j"$JOBS" Image.gz-dtb modules 2>&1 | tee "$LOG"
 # ---------------------------------------------------------------------------
 # Verify ReSukiSU was built with all manual hooks
 # ---------------------------------------------------------------------------
-if grep -qE 'ReSukiSU version code|ReSukiSU: using Manual Hook|manual_hook:' "$LOG"; then
+if grep -qE 'ReSukiSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG"; then
     echo
     echo "[verify] ReSukiSU build info:"
-    grep -E 'ReSukiSU version code|ReSukiSU: using Manual Hook|manual_hook:' "$LOG" | sort -u
+    grep -E 'ReSukiSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG" | sort -u
 else
     echo "WARNING: ReSukiSU version/hook lines not found in log" >&2
 fi

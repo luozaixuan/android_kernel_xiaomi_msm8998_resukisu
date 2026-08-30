@@ -9,10 +9,13 @@ hooks for this 4.4 kernel.
 - `ReSukiSU/` - ReSukiSU git submodule
 - `drivers/kernelsu` - relative symlink to `ReSukiSU/kernel`
 - `arch/arm64/configs/resukisu.config` - ReSukiSU build config fragment
-- `fs/stat.c`, `fs/exec.c`, `fs/open.c`, `kernel/reboot.c` - manual hooks
-  (all under `CONFIG_KSU_MANUAL_HOOK`)
-- setuid / init rc / input are applied automatically via LSM / input handler
-  (`CONFIG_KSU_MANUAL_HOOK_AUTO_*`), which ReSukiSU supports on 4.4
+- `fs/susfs.c`, `include/linux/susfs.h`, `include/linux/susfs_def.h` - SusFS
+  v2.2.0 kernel-side integration (from `susfs/susfs_patch_to_4.4.patch`)
+- SusFS inline KSU hooks in `fs/exec.c`, `fs/open.c`, `fs/stat.c`,
+  `fs/read_write.c`, `kernel/reboot.c`, `kernel/sys.c`,
+  `drivers/input/input.c` (from `susfs/susfs_inline_hook_patches.sh`,
+  manually fixed for this msm8998 4.4 tree)
+- Hook mode: **SuSFS Inline Hook** (`CONFIG_KSU_SUSFS=y`)
 
 ## Build
 
@@ -69,3 +72,7 @@ Typical flow: `./update-resukisu.sh` -> `./build-resukisu.sh` -> `./package-ak3.
    compatibility.
 
 The zip only replaces the boot image via AnyKernel3; it does not wipe data.
+
+SusFS features (hide sus paths / mounts / kstat, spoof uname & cmdline,
+open redirect, sus map, etc.) are configured from the ReSukiSU manager
+(SuSFS tab).
