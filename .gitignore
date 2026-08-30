@@ -128,3 +128,4 @@ Android.bp
 # ReSukiSU local build artifacts (do not commit)
 /out/
 /Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip
+/build-resukisu.log
