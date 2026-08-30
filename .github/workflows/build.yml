@@ -1,0 +1,61 @@
+name: Build & Package ReSukiSU
+
+# 有提交（任意分支/标签）或手动触发时，立即编译并打包 chiron/sagit 两个 AK3
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ReSukiSU 版本码 = 30000 + 提交数 + 700，浅克隆会导致版本码只有 30701，
+      # 低于管理器要求的 34634，所以必须取回子模块完整历史。
+      - name: Unshallow ReSukiSU submodule
+        run: |
+          git -C ReSukiSU fetch --unshallow origin || true
+          echo "ReSukiSU commit count: $(git -C ReSukiSU rev-list --count HEAD)"
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git make flex bison bc \
+            libssl-dev libelf-dev \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+
+      - name: Build kernel
+        run: ./build-resukisu.sh
+
+      - name: Package AnyKernel3 (chiron)
+        run: ./package-ak3.sh -d
+
+      - name: Package AnyKernel3 (sagit)
+        run: ./package-ak3.sh -D sagit
+
+      - name: Show artifacts
+        run: |
+          ls -lh *.zip out/arch/arm64/boot/Image.gz-dtb
+          sha256sum *.zip out/arch/arm64/boot/Image.gz-dtb
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: resukisu-${{ github.ref_name }}
+          path: |
+            Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip
+            Sagit-ReSukiSU-Lineage22.2-AnyKernel3.zip
+            out/arch/arm64/boot/Image.gz-dtb
+            build-resukisu.log
+          if-no-files-found: error
+          retention-days: 30
