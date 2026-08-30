@@ -43,7 +43,8 @@ Or simply run `./build.sh`.
 - `./package-ak3.sh` - one-click packaging of the built kernel into
   `Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip`
   (auto-extracts the existing zip as AnyKernel3 template, or use `-t DIR` /
-  `-d` to clone the official template)
+  `-d` to clone the official template; use `-D sagit` for a device-name
+  variant zip such as `Sagit-ReSukiSU-Lineage22.2-AnyKernel3.zip`)
 
 Typical flow: `./update-resukisu.sh` -> `./build-resukisu.sh` -> `./package-ak3.sh`.
 
