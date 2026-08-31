@@ -94,7 +94,8 @@ if [ -n "$KERNEL_CHANGES" ]; then
     echo
     echo "WARNING: kernel/ changed. Manual integration may be required:"
     echo "$KERNEL_CHANGES" | sed 's/^/  /'
-    echo "  - check kernel/tools/manual_hook_check.mk for new hook checks"
+    echo "  - check kernel/tools/manual_hook_check.mk (Manual Hook mode)"
+    echo "  - check kernel/tools/inline_hook_check.mk + susfs_compat.mk (SusFS mode)"
     echo "  - check kernel/Kconfig for new options"
     echo "  - docs: https://resukisu.github.io/guide/manual-integrate.html"
     if [ "$FORCE" -ne 1 ]; then
@@ -153,7 +154,7 @@ else
 
     echo "[5/6] building kernel (-j$JOBS)"
     make O=out -j"$JOBS" Image.gz-dtb modules 2>&1 | tee "$LOG"
-    grep -E 'ReSukiSU version code|ReSukiSU: using Manual Hook|manual_hook:' "$LOG" || true
+    grep -E 'ReSukiSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG" || true
 fi
 
 IMAGE="$REPO_DIR/out/arch/arm64/boot/Image.gz-dtb"
