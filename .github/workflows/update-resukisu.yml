@@ -1,0 +1,173 @@
+name: Update ReSukiSU & Repackage
+
+# 手动触发：自动把 ReSukiSU 子模块更新到最新 main。
+# - 如果 kernel/ 没有变化（不需要重新打 hook）：自动提交子模块指针并推送，
+#   然后编译内核并打包 chiron/sagit 两个 AK3 zip。
+# - 如果 kernel/ 有变化：停止并提示需要本地重新做 SusFS hook / 手动集成。
+#
+# 注意：使用 GITHUB_TOKEN 推送不会重复触发 build.yml，
+# 所以本 workflow 自己负责编译+打包，无需依赖 push 事件。
+
+on:
+  workflow_dispatch:
+    inputs:
+      push:
+        description: '提交并推送子模块指针到当前分支'
+        type: boolean
+        default: true
+      allow-kernel-changes:
+        description: '即使 kernel/ 有改动也继续（需要本地重新 hook，慎用）'
+        type: boolean
+        default: false
+
+concurrency:
+  group: update-resukisu-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  update-build-package:
+    name: Update ReSukiSU, build & package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout (full history + submodules)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      # 版本码 = 30000 + 提交数 + 700，必须 >= 34634，所以子模块需要完整历史。
+      - name: Unshallow ReSukiSU submodule
+        run: |
+          git -C ReSukiSU fetch --unshallow origin || true
+          echo "ReSukiSU commit count: $(git -C ReSukiSU rev-list --count HEAD)"
+
+      - name: Set git identity
+        run: |
+          git config user.name "luozaixuan"
+          git config user.email "147116228+luozaixuan@users.noreply.github.com"
+
+      - name: Update ReSukiSU to latest main
+        id: update
+        run: |
+          set -e
+          OLD="$(git -C ReSukiSU rev-parse HEAD)"
+          git -C ReSukiSU fetch origin main
+          git -C ReSukiSU checkout -q origin/main
+          NEW="$(git -C ReSukiSU rev-parse HEAD)"
+
+          echo "old=$OLD" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+
+          if [ "$OLD" = "$NEW" ]; then
+            echo "Already up to date: $OLD"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "OLD: $OLD"
+          echo "NEW: $NEW"
+          echo
+          echo "--- commits ---"
+          git -C ReSukiSU log --oneline "$OLD..$NEW"
+          echo
+          echo "--- changed files ---"
+          git -C ReSukiSU diff --stat "$OLD" "$NEW" || true
+
+          # 版本码校验
+          COUNT="$(git -C ReSukiSU rev-list --count HEAD)"
+          VERSION="$((30000 + COUNT + 700))"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "ReSukiSU version code: $VERSION (commit count: $COUNT)"
+          if [ "$VERSION" -lt 34634 ]; then
+            echo "ERROR: version code below 34634; submodule is probably a shallow clone." >&2
+            exit 1
+          fi
+
+          # kernel/ 改动检测
+          KERNEL_CHANGES="$(git -C ReSukiSU diff --name-only "$OLD" "$NEW" -- kernel/ || true)"
+          if [ -n "$KERNEL_CHANGES" ]; then
+            echo "kernel_changed=true" >> "$GITHUB_OUTPUT"
+            echo "KERNEL_CHANGES<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$KERNEL_CHANGES" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "kernel_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require manual re-hook when kernel/ changed
+        if: steps.update.outputs.changed == 'true' && steps.update.outputs.kernel_changed == 'true' && github.event.inputs.allow-kernel-changes != 'true'
+        env:
+          KERNEL_CHANGES: ${{ steps.update.outputs.KERNEL_CHANGES }}
+        run: |
+          echo "::error::ReSukiSU kernel/ 目录有改动，需要本地重新集成 SusFS hook，已停止自动流程。"
+          echo "改动的文件："
+          echo "$KERNEL_CHANGES"
+          echo
+          echo "请本地执行：./update-resukisu.sh -n --no-commit"
+          echo "然后按 susfs/ 下的脚本/文档重新打 hook，再手动编译打包。"
+          exit 1
+
+      - name: Commit submodule pointer
+        if: steps.update.outputs.changed == 'true' && github.event.inputs.push == 'true'
+        run: |
+          git add ReSukiSU
+          if ! git diff --cached --quiet; then
+            DESCR="$(git -C ReSukiSU describe --tags --always --dirty=-dirty)"
+            git commit -m "ReSukiSU: update submodule to $DESCR"
+            echo "committed: $DESCR"
+          else
+            echo "no submodule pointer change to commit"
+          fi
+
+      - name: Push to branch
+        if: steps.update.outputs.changed == 'true' && github.event.inputs.push == 'true'
+        run: |
+          git push origin "HEAD:${{ github.ref_name }}"
+          echo "pushed to ${{ github.ref_name }}"
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git make flex bison bc \
+            libssl-dev libelf-dev \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+
+      - name: Build kernel
+        run: ./build-resukisu.sh
+
+      - name: Package AnyKernel3 (chiron)
+        run: ./package-ak3.sh -d
+
+      - name: Package AnyKernel3 (sagit)
+        run: ./package-ak3.sh -D sagit
+
+      - name: Show artifacts
+        run: |
+          ls -lh *.zip out/arch/arm64/boot/Image.gz-dtb
+          sha256sum *.zip out/arch/arm64/boot/Image.gz-dtb
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: resukisu-${{ steps.update.outputs.new || github.sha }}
+          path: |
+            Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip
+            Sagit-ReSukiSU-Lineage22.2-AnyKernel3.zip
+            out/arch/arm64/boot/Image.gz-dtb
+            build-resukisu.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Update ReSukiSU 结果" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 更新前: ${{ steps.update.outputs.old }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 更新后: ${{ steps.update.outputs.new }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 版本码: ${{ steps.update.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- kernel/ 有改动: ${{ steps.update.outputs.kernel_changed }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 推送: ${{ github.event.inputs.push }}" >> "$GITHUB_STEP_SUMMARY"
