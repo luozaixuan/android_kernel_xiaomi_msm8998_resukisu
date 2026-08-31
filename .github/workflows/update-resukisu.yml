@@ -1,18 +1,20 @@
-name: Update ReSukiSU & Repackage
+name: Update ReSukiSU
 
-# 手动触发：自动把 ReSukiSU 子模块更新到最新 main。
-# - 如果 kernel/ 没有变化（不需要重新打 hook）：自动提交子模块指针并推送，
-#   然后编译内核并打包 chiron/sagit 两个 AK3 zip。
-# - 如果 kernel/ 有变化：停止并提示需要本地重新做 SusFS hook / 手动集成。
-#
-# 注意：使用 GITHUB_TOKEN 推送不会重复触发 build.yml，
-# 所以本 workflow 自己负责编译+打包，无需依赖 push 事件。
+# 手动触发：自动把 ReSukiSU 子模块更新到最新 main，提交并推送子模块指针。
+# 编译和打包仍由原 build.yml 负责：
+#   - 本 workflow 推送用的 GITHUB_TOKEN 不会触发 push 事件，
+#     所以推送后显式调用一次 build.yml 的 workflow_dispatch 来编译打包。
+#   - 如果 kernel/ 有改动（需要重新打 hook），直接停止，不提交不推送。
 
 on:
   workflow_dispatch:
     inputs:
       push:
         description: '提交并推送子模块指针到当前分支'
+        type: boolean
+        default: true
+      run-build:
+        description: '推送后触发 build.yml 自动编译打包'
         type: boolean
         default: true
       allow-kernel-changes:
@@ -26,12 +28,13 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
-  update-build-package:
-    name: Update ReSukiSU, build & package
+  update:
+    name: Update ReSukiSU submodule
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 30
     steps:
       - name: Checkout (full history + submodules)
         uses: actions/checkout@v4
@@ -123,44 +126,21 @@ jobs:
             echo "no submodule pointer change to commit"
           fi
 
-      - name: Push to branch
+      - name: Push submodule pointer
         if: steps.update.outputs.changed == 'true' && github.event.inputs.push == 'true'
         run: |
           git push origin "HEAD:${{ github.ref_name }}"
           echo "pushed to ${{ github.ref_name }}"
 
-      - name: Install toolchain
+      # GITHUB_TOKEN 推送不会触发 build.yml 的 push 事件，这里显式 dispatch。
+      - name: Trigger build.yml (build & package)
+        if: steps.update.outputs.changed == 'true' && github.event.inputs.push == 'true' && github.event.inputs.run-build == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git make flex bison bc \
-            libssl-dev libelf-dev \
-            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
-
-      - name: Build kernel
-        run: ./build-resukisu.sh
-
-      - name: Package AnyKernel3 (chiron)
-        run: ./package-ak3.sh -d
-
-      - name: Package AnyKernel3 (sagit)
-        run: ./package-ak3.sh -D sagit
-
-      - name: Show artifacts
-        run: |
-          ls -lh *.zip out/arch/arm64/boot/Image.gz-dtb
-          sha256sum *.zip out/arch/arm64/boot/Image.gz-dtb
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: resukisu-${{ steps.update.outputs.new || github.sha }}
-          path: |
-            Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip
-            Sagit-ReSukiSU-Lineage22.2-AnyKernel3.zip
-            out/arch/arm64/boot/Image.gz-dtb
-            build-resukisu.log
-          if-no-files-found: error
-          retention-days: 30
+          gh api -X POST "repos/${{ github.repository }}/actions/workflows/build.yml/dispatches" \
+            -f ref="${{ github.ref_name }}"
+          echo "dispatched build.yml on ${{ github.ref_name }}"
 
       - name: Summary
         if: always()
@@ -170,4 +150,5 @@ jobs:
           echo "- 更新后: ${{ steps.update.outputs.new }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- 版本码: ${{ steps.update.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- kernel/ 有改动: ${{ steps.update.outputs.kernel_changed }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 推送: ${{ github.event.inputs.push }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 已推送: ${{ github.event.inputs.push }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 已触发 build.yml: ${{ github.event.inputs.run-build }}" >> "$GITHUB_STEP_SUMMARY"
