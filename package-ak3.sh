@@ -139,9 +139,12 @@ cp -f "$IMAGE" "$TEMPLATE/Image.gz-dtb"
 
 if [ "$UPDATE_STRING" -eq 1 ] && [ -f "$TEMPLATE/anykernel.sh" ]; then
     STRING="Chiron-ReSukiSU ${SHORT} (${VERSION}) 4.4.302-perf-resukisu for LineageOS 22.2"
-    if [ -n "$DEVICE" ] && grep -q '^device.name1=' "$TEMPLATE/anykernel.sh"; then
-        sed -i "s|^device.name1=.*|device.name1=${DEVICE}|" "$TEMPLATE/anykernel.sh"
-        echo "[package] device.name1=$DEVICE"
+    # 默认设备为 chiron：即使没有 -D（例如 CI 里 ./package-ak3.sh -d），
+    # 也必须覆盖官方模板自带的 device.name1=maguro，否则刷入会报 unsupported device。
+    if grep -q '^device.name1=' "$TEMPLATE/anykernel.sh"; then
+        DEV="${DEVICE:-chiron}"
+        sed -i "s|^device.name1=.*|device.name1=${DEV}|" "$TEMPLATE/anykernel.sh"
+        echo "[package] device.name1=$DEV"
     fi
     if grep -q '^kernel.string=' "$TEMPLATE/anykernel.sh"; then
         sed -i "s|^kernel.string=.*|kernel.string=${STRING}|" "$TEMPLATE/anykernel.sh"

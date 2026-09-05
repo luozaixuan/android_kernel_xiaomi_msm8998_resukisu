@@ -38,7 +38,7 @@ jobs:
         run: ./build-resukisu.sh
 
       - name: Package AnyKernel3 (chiron)
-        run: ./package-ak3.sh -d
+        run: ./package-ak3.sh -d -D chiron
 
       - name: Package AnyKernel3 (sagit)
         run: ./package-ak3.sh -D sagit
