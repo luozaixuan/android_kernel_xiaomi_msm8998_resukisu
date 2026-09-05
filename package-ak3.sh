@@ -101,6 +101,13 @@ with zipfile.ZipFile(src) as zf:
             os.chmod(target, mode)
 PY
     TEMPLATE="$WORK"
+elif [ -d "$REPO_DIR/anykernel" ] && [ -f "$REPO_DIR/anykernel/anykernel.sh" ]; then
+    # 仓库内置的 chiron/sagit AnyKernel3 模板（和本地打包同一份），
+    # 避免 CI 克隆官方模板时带上 Galaxy Nexus 的 BLOCK / device.name1。
+    WORK="$(mktemp -d "$REPO_DIR/out/ak3-template.XXXXXX")"
+    echo "[template] using repo-local template: $REPO_DIR/anykernel -> $WORK"
+    cp -a "$REPO_DIR/anykernel/." "$WORK/"
+    TEMPLATE="$WORK"
 elif [ "$DOWNLOAD" -eq 1 ]; then
     WORK="$(mktemp -d "$REPO_DIR/out/ak3-official.XXXXXX")"
     echo "[template] cloning official AnyKernel3: $WORK"
