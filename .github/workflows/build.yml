@@ -1,8 +1,11 @@
 name: Build & Package ReSukiSU
 
-# 有提交（任意分支/标签）或手动触发时，立即编译并打包 chiron/sagit 两个 AK3
+# 仅在 lineage-22.2 分支有提交时自动编译打包（tag/其它分支不触发，
+# 避免发 Release 时对同一提交重复编译）；也可手动触发。
 on:
   push:
+    branches:
+      - lineage-22.2
   workflow_dispatch:
 
 concurrency:

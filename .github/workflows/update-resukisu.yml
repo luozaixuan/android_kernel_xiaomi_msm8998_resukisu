@@ -36,6 +36,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Guard branch (only lineage-22.2)
+        if: github.ref_type != 'branch' || github.ref_name != 'lineage-22.2'
+        run: |
+          echo "::error::此 workflow 只应在 lineage-22.2 分支上运行（当前: ${{ github.ref_type }}/${{ github.ref_name }}），已停止。"
+          exit 1
+
       - name: Checkout (full history + submodules)
         uses: actions/checkout@v4
         with:
@@ -151,4 +157,4 @@ jobs:
           echo "- 版本码: ${{ steps.update.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- kernel/ 有改动: ${{ steps.update.outputs.kernel_changed }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- 已推送: ${{ github.event.inputs.push }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 已触发 build.yml: ${{ github.event.inputs.run-build }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 已触发 build.yml: ${{ steps.update.outputs.changed == 'true' && github.event.inputs.push == 'true' && github.event.inputs.run-build == 'true' }}" >> "$GITHUB_STEP_SUMMARY"
