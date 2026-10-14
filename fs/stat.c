@@ -19,11 +19,20 @@
 #include <asm/unistd.h>
 #ifdef CONFIG_KSU_SUSFS
 #include <linux/susfs_def.h>
+#include "mount.h"
 #endif
+#ifdef CONFIG_KSU_SUSFS
+extern struct static_key_true ksu_is_init_rc_hook_enabled;
+extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
+extern struct static_key_true ksu_su_compat_enabled;
+extern bool __ksu_is_allow_uid_for_current(uid_t uid);
+extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
+#endif // #ifdef CONFIG_KSU_SUSFS
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-extern void susfs_sus_kstat_spoof_generic_fillattr(struct inode *inode, struct kstat *stat);
-#endif
+extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
+extern void susfs_sus_kstat_spoof_generic_fillattr(struct inode *inode, struct kstat *stat, u32 result_mask);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 
 void generic_fillattr(struct inode *inode, struct kstat *stat)
 {
@@ -40,9 +49,6 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 	stat->ctime = inode->i_ctime;
 	stat->blksize = i_blocksize(inode);
 	stat->blocks = inode->i_blocks;
-#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-	susfs_sus_kstat_spoof_generic_fillattr(inode, stat);
-#endif
 }
 
 EXPORT_SYMBOL(generic_fillattr);
@@ -62,6 +68,17 @@ EXPORT_SYMBOL(generic_fillattr);
 int vfs_getattr_nosec(struct path *path, struct kstat *stat)
 {
 	struct inode *inode = d_backing_inode(path->dentry);
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+	u32 result_mask = 0;
+	bool is_fuse = false;
+#endif
+
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+	if (susfs_is_current_app_uid() &&
+	    susfs_is_inode_sus_kstat(inode, &is_fuse))
+		result_mask = is_fuse ? STATX_SUS_KSTAT_FUSE :
+			STATX_SUS_KSTAT;
+#endif
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 	if (inode->i_op->getattr) {
@@ -70,19 +87,25 @@ int vfs_getattr_nosec(struct path *path, struct kstat *stat)
 #endif
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-		int err = inode->i_op->getattr(path->mnt, path->dentry, stat);
-#else
-		return inode->i_op->getattr(path->mnt, path->dentry, stat);
-#endif
+		int err;
 
-#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-		if (!err)
-			susfs_sus_kstat_spoof_generic_fillattr(inode, stat);
+		err = inode->i_op->getattr(path->mnt, path->dentry, stat);
+
+		if (!err && result_mask)
+			susfs_sus_kstat_spoof_generic_fillattr(inode, stat,
+					result_mask);
+
 		return err;
 	}
-#endif
+#else
+		return inode->i_op->getattr(path->mnt, path->dentry, stat);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 
 	generic_fillattr(inode, stat);
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+	if (result_mask)
+		susfs_sus_kstat_spoof_generic_fillattr(inode, stat, result_mask);
+#endif
 	return 0;
 }
 
@@ -99,11 +122,6 @@ int vfs_getattr(struct path *path, struct kstat *stat)
 }
 
 EXPORT_SYMBOL(vfs_getattr);
-
-#ifdef CONFIG_KSU_SUSFS
-extern struct static_key_true ksu_is_init_rc_hook_enabled;
-extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
-#endif // #ifdef CONFIG_KSU_SUSFS
 
 int vfs_fstat(unsigned int fd, struct kstat *stat)
 {
@@ -123,14 +141,6 @@ int vfs_fstat(unsigned int fd, struct kstat *stat)
 }
 EXPORT_SYMBOL(vfs_fstat);
 
-#ifdef CONFIG_KSU_SUSFS
-extern struct static_key_true ksu_su_compat_enabled;
-extern bool __ksu_is_allow_uid_for_current(uid_t uid);
-extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
-extern int filename_lookup(int dfd, struct filename *name, unsigned flags,
-				struct path *path, struct path *root);
-#endif
-
 int vfs_fstatat(int dfd, const char __user *filename, struct kstat *stat,
 		int flag)
 {
@@ -138,8 +148,11 @@ int vfs_fstatat(int dfd, const char __user *filename, struct kstat *stat,
 	int error = -EINVAL;
 	unsigned int lookup_flags = 0;
 #ifdef CONFIG_KSU_SUSFS
-	struct filename *fname;
+	struct filename *fname = NULL;
+	extern int filename_lookup(int dfd, struct filename *name, unsigned flags,
+					struct path *path, struct path *root);
 #endif
+
 
 	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT |
 		      AT_EMPTY_PATH)) != 0)

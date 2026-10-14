@@ -1,8 +1,8 @@
 #!/bin/bash
-# One-click build of the chiron (Xiaomi Mi MIX 2) ReSukiSU kernel.
+# One-click build of the chiron (Xiaomi Mi MIX 2) BakaSU kernel.
 #
 # Usage:
-#   ./build-resukisu.sh [options]
+#   ./build-bakasu.sh [options]
 #
 # Options:
 #   -j, --jobs N       Build parallelism (default: nproc)
@@ -12,13 +12,13 @@
 #
 # Output:
 #   out/arch/arm64/boot/Image.gz-dtb   built kernel image
-#   build-resukisu.log                 full build log
+#   build-bakasu.log                 full build log
 #
 # After building, run ./package-ak3.sh to create the flashable AnyKernel3 zip.
 set -euo pipefail
 
 REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-LOG="$REPO_DIR/build-resukisu.log"
+LOG="$REPO_DIR/build-bakasu.log"
 JOBS="$(nproc)"
 CLEAN=0
 KEEP_CONFIG=0
@@ -53,8 +53,8 @@ for t in aarch64-linux-gnu-gcc arm-linux-gnueabihf-gcc make bc bison flex git py
     need "$t"
 done
 
-echo "[prep] ReSukiSU submodule"
-git submodule update --init --recursive ReSukiSU
+echo "[prep] BakaSU submodule"
+git submodule update --init --recursive BakaSU
 
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
@@ -71,29 +71,29 @@ fi
 if [ "$KEEP_CONFIG" -eq 1 ] && [ -f out/.config ]; then
     echo "[config] reusing existing out/.config (-k)"
 else
-    echo "[config] generating config: chiron_defconfig + resukisu.config"
+    echo "[config] generating config: chiron_defconfig + bakasu.config"
     make O=out chiron_defconfig
     scripts/kconfig/merge_config.sh -m -O out \
         arch/arm64/configs/chiron_defconfig \
-        arch/arm64/configs/resukisu.config
+        arch/arm64/configs/bakasu.config
     make O=out olddefconfig
 fi
 
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
-echo "[build] make O=out -j$JOBS Image.gz-dtb modules (log: build-resukisu.log)"
+echo "[build] make O=out -j$JOBS Image.gz-dtb modules (log: build-bakasu.log)"
 make O=out -j"$JOBS" Image.gz-dtb modules 2>&1 | tee "$LOG"
 
 # ---------------------------------------------------------------------------
-# Verify ReSukiSU was built with all manual hooks
+# Verify BakaSU was built with all manual hooks
 # ---------------------------------------------------------------------------
-if grep -qE 'ReSukiSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG"; then
+if grep -qE 'BakaSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG"; then
     echo
-    echo "[verify] ReSukiSU build info:"
-    grep -E 'ReSukiSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG" | sort -u
+    echo "[verify] BakaSU build info:"
+    grep -E 'BakaSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG" | sort -u
 else
-    echo "WARNING: ReSukiSU version/hook lines not found in log" >&2
+    echo "WARNING: BakaSU version/hook lines not found in log" >&2
 fi
 
 IMAGE="$REPO_DIR/out/arch/arm64/boot/Image.gz-dtb"
@@ -105,6 +105,6 @@ if [ -f "$IMAGE" ]; then
     echo
     echo "Next: ./package-ak3.sh"
 else
-    echo "ERROR: $IMAGE not found; build failed (see build-resukisu.log)" >&2
+    echo "ERROR: $IMAGE not found; build failed (see build-bakasu.log)" >&2
     exit 1
 fi

@@ -1,6 +1,6 @@
-name: Update ReSukiSU
+name: Update BakaSU
 
-# 手动触发：自动把 ReSukiSU 子模块更新到最新 main，提交并推送子模块指针。
+# 手动触发：自动把 BakaSU 子模块更新到最新 sync-susfs，提交并推送子模块指针。
 # 编译和打包仍由原 build.yml 负责：
 #   - 本 workflow 推送用的 GITHUB_TOKEN 不会触发 push 事件，
 #     所以推送后显式调用一次 build.yml 的 workflow_dispatch 来编译打包。
@@ -23,7 +23,7 @@ on:
         default: false
 
 concurrency:
-  group: update-resukisu-${{ github.ref }}
+  group: update-bakasu-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   update:
-    name: Update ReSukiSU submodule
+    name: Update BakaSU submodule
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -49,24 +49,24 @@ jobs:
           submodules: recursive
 
       # 版本码 = 30000 + 提交数 + 700，必须 >= 34634，所以子模块需要完整历史。
-      - name: Unshallow ReSukiSU submodule
+      - name: Unshallow BakaSU submodule
         run: |
-          git -C ReSukiSU fetch --unshallow origin || true
-          echo "ReSukiSU commit count: $(git -C ReSukiSU rev-list --count HEAD)"
+          git -C BakaSU fetch --unshallow origin || true
+          echo "BakaSU commit count: $(git -C BakaSU rev-list --count HEAD)"
 
       - name: Set git identity
         run: |
           git config user.name "luozaixuan"
           git config user.email "147116228+luozaixuan@users.noreply.github.com"
 
-      - name: Update ReSukiSU to latest main
+      - name: Update BakaSU to latest sync-susfs
         id: update
         run: |
           set -e
-          OLD="$(git -C ReSukiSU rev-parse HEAD)"
-          git -C ReSukiSU fetch origin main
-          git -C ReSukiSU checkout -q origin/main
-          NEW="$(git -C ReSukiSU rev-parse HEAD)"
+          OLD="$(git -C BakaSU rev-parse HEAD)"
+          git -C BakaSU fetch origin sync-susfs
+          git -C BakaSU checkout -q origin/sync-susfs
+          NEW="$(git -C BakaSU rev-parse HEAD)"
 
           echo "old=$OLD" >> "$GITHUB_OUTPUT"
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
@@ -81,23 +81,23 @@ jobs:
           echo "NEW: $NEW"
           echo
           echo "--- commits ---"
-          git -C ReSukiSU log --oneline "$OLD..$NEW"
+          git -C BakaSU log --oneline "$OLD..$NEW"
           echo
           echo "--- changed files ---"
-          git -C ReSukiSU diff --stat "$OLD" "$NEW" || true
+          git -C BakaSU diff --stat "$OLD" "$NEW" || true
 
           # 版本码校验
-          COUNT="$(git -C ReSukiSU rev-list --count HEAD)"
+          COUNT="$(git -C BakaSU rev-list --count HEAD)"
           VERSION="$((30000 + COUNT + 700))"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "ReSukiSU version code: $VERSION (commit count: $COUNT)"
+          echo "BakaSU version code: $VERSION (commit count: $COUNT)"
           if [ "$VERSION" -lt 34634 ]; then
             echo "ERROR: version code below 34634; submodule is probably a shallow clone." >&2
             exit 1
           fi
 
           # kernel/ 改动检测
-          KERNEL_CHANGES="$(git -C ReSukiSU diff --name-only "$OLD" "$NEW" -- kernel/ || true)"
+          KERNEL_CHANGES="$(git -C BakaSU diff --name-only "$OLD" "$NEW" -- kernel/ || true)"
           if [ -n "$KERNEL_CHANGES" ]; then
             echo "kernel_changed=true" >> "$GITHUB_OUTPUT"
             echo "KERNEL_CHANGES<<EOF" >> "$GITHUB_OUTPUT"
@@ -112,21 +112,21 @@ jobs:
         env:
           KERNEL_CHANGES: ${{ steps.update.outputs.KERNEL_CHANGES }}
         run: |
-          echo "::error::ReSukiSU kernel/ 目录有改动，需要本地重新集成 SusFS hook，已停止自动流程。"
+          echo "::error::BakaSU kernel/ 目录有改动，需要本地重新集成 SusFS hook，已停止自动流程。"
           echo "改动的文件："
           echo "$KERNEL_CHANGES"
           echo
-          echo "请本地执行：./update-resukisu.sh -n --no-commit"
+          echo "请本地执行：./update-bakasu.sh -n --no-commit"
           echo "然后按 susfs/ 下的脚本/文档重新打 hook，再手动编译打包。"
           exit 1
 
       - name: Commit submodule pointer
         if: steps.update.outputs.changed == 'true' && github.event.inputs.push == 'true'
         run: |
-          git add ReSukiSU
+          git add BakaSU
           if ! git diff --cached --quiet; then
-            DESCR="$(git -C ReSukiSU describe --tags --always --dirty=-dirty)"
-            git commit -m "ReSukiSU: update submodule to $DESCR"
+            DESCR="$(git -C BakaSU describe --tags --always --dirty=-dirty)"
+            git commit -m "BakaSU: update submodule to $DESCR"
             echo "committed: $DESCR"
           else
             echo "no submodule pointer change to commit"
@@ -151,7 +151,7 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "## Update ReSukiSU 结果" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Update BakaSU 结果" >> "$GITHUB_STEP_SUMMARY"
           echo "- 更新前: ${{ steps.update.outputs.old }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- 更新后: ${{ steps.update.outputs.new }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- 版本码: ${{ steps.update.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"

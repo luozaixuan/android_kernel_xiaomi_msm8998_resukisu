@@ -126,7 +126,7 @@ android/configs/android-*.cfg
 #
 Android.bp
 
-# ReSukiSU local build artifacts (do not commit)
+# BakaSU local build artifacts (do not commit)
 /out/
-/*-ReSukiSU-Lineage22.2-AnyKernel3.zip
-/build-resukisu.log
+/*-BakaSU-Lineage22.2-AnyKernel3.zip
+/build-bakasu.log

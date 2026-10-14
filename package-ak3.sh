@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-click packaging of the built chiron ReSukiSU kernel into an AnyKernel3 zip.
+# One-click packaging of the built chiron BakaSU kernel into an AnyKernel3 zip.
 #
 # Usage:
 #   ./package-ak3.sh [options]
@@ -10,7 +10,7 @@
 #   -t, --template DIR    AnyKernel3 template directory (must contain anykernel.sh)
 #   -d, --download        Clone the official AnyKernel3 template if needed
 #   -o, --output PATH     Output zip path
-#                         (default: Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip)
+#                         (default: Chiron-BakaSU-Lineage22.2-AnyKernel3.zip)
 #   -D, --device NAME     Set device.name1 in anykernel.sh and name the output
 #                         zip after the device (e.g. -D sagit -> Sagit-...zip)
 #   --no-kernel-string    Do not rewrite kernel.string in anykernel.sh
@@ -18,12 +18,12 @@
 #
 # Template resolution (first match wins):
 #   1. --template DIR
-#   2. existing Chiron-ReSukiSU-...zip in the repo (extracted automatically)
+#   2. existing Chiron-BakaSU-...zip in the repo (extracted automatically)
 #   3. --download (official https://github.com/osm0sis/AnyKernel3)
 set -euo pipefail
 
 REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-SUBMODULE="$REPO_DIR/ReSukiSU"
+SUBMODULE="$REPO_DIR/BakaSU"
 IMAGE="$REPO_DIR/out/arch/arm64/boot/Image.gz-dtb"
 TEMPLATE=""
 DOWNLOAD=0
@@ -52,9 +52,9 @@ done
 if [ -z "$OUT" ]; then
     if [ -n "$DEVICE" ]; then
         CAP="$(printf '%s' "$DEVICE" | cut -c1 | tr '[:lower:]' '[:upper:]')$(printf '%s' "$DEVICE" | cut -c2-)"
-        OUT="$REPO_DIR/${CAP}-ReSukiSU-Lineage22.2-AnyKernel3.zip"
+        OUT="$REPO_DIR/${CAP}-BakaSU-Lineage22.2-AnyKernel3.zip"
     else
-        OUT="$REPO_DIR/Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip"
+        OUT="$REPO_DIR/Chiron-BakaSU-Lineage22.2-AnyKernel3.zip"
     fi
 fi
 case "$OUT" in
@@ -67,7 +67,7 @@ esac
 # ---------------------------------------------------------------------------
 if [ ! -f "$IMAGE" ]; then
     echo "ERROR: kernel image not found: $IMAGE" >&2
-    echo "       Build it first with ./build-resukisu.sh" >&2
+    echo "       Build it first with ./build-bakasu.sh" >&2
     exit 1
 fi
 
@@ -81,10 +81,10 @@ if [ -n "$TEMPLATE" ]; then
         exit 1
     fi
     echo "[template] using: $TEMPLATE"
-elif [ -f "$REPO_DIR/Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip" ]; then
+elif [ -f "$REPO_DIR/Chiron-BakaSU-Lineage22.2-AnyKernel3.zip" ]; then
     WORK="$(mktemp -d "$REPO_DIR/out/ak3-template.XXXXXX")"
     echo "[template] extracting existing zip as template: $WORK"
-    python3 - "$REPO_DIR/Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip" "$WORK" <<'PY'
+    python3 - "$REPO_DIR/Chiron-BakaSU-Lineage22.2-AnyKernel3.zip" "$WORK" <<'PY'
 import os, sys, zipfile
 src, dst = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(src) as zf:
@@ -124,7 +124,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. ReSukiSU version info (for kernel.string)
+# 3. BakaSU version info (for kernel.string)
 # ---------------------------------------------------------------------------
 VERSION="unknown"
 SHORT="unknown"
@@ -132,7 +132,7 @@ if git -C "$SUBMODULE" rev-parse --git-dir >/dev/null 2>&1; then
     COUNT="$(git -C "$SUBMODULE" rev-list --count HEAD)"
     VERSION="$((30000 + COUNT + 700))"
     SHORT="$(git -C "$SUBMODULE" rev-parse --short=8 HEAD)"
-    echo "[version] ReSukiSU $SHORT, version code $VERSION (commit count: $COUNT)"
+    echo "[version] BakaSU $SHORT, version code $VERSION (commit count: $COUNT)"
     if [ "$VERSION" -lt "$MIN_VERSION" ]; then
         echo "WARNING: version code below $MIN_VERSION. The submodule is probably a shallow clone." >&2
     fi
@@ -145,7 +145,7 @@ echo "[package] copying $IMAGE -> $TEMPLATE/Image.gz-dtb"
 cp -f "$IMAGE" "$TEMPLATE/Image.gz-dtb"
 
 if [ "$UPDATE_STRING" -eq 1 ] && [ -f "$TEMPLATE/anykernel.sh" ]; then
-    STRING="Chiron-ReSukiSU ${SHORT} (${VERSION}) 4.4.302-perf-resukisu for LineageOS 22.2"
+    STRING="Chiron-BakaSU ${SHORT} (${VERSION}) 4.4.302-perf-bakasu for LineageOS 22.2"
     # 默认设备为 chiron：即使没有 -D（例如 CI 里 ./package-ak3.sh -d），
     # 也必须覆盖官方模板自带的 device.name1=maguro，否则刷入会报 unsupported device。
     if grep -q '^device.name1=' "$TEMPLATE/anykernel.sh"; then

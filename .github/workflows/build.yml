@@ -1,4 +1,4 @@
-name: Build & Package ReSukiSU
+name: Build & Package BakaSU
 
 # 仅在 lineage-22.2 分支有提交时自动编译打包（tag/其它分支不触发，
 # 避免发 Release 时对同一提交重复编译）；也可手动触发。
@@ -23,12 +23,12 @@ jobs:
         with:
           submodules: recursive
 
-      # ReSukiSU 版本码 = 30000 + 提交数 + 700，浅克隆会导致版本码只有 30701，
+      # BakaSU 版本码 = 30000 + 提交数 + 700，浅克隆会导致版本码只有 30701，
       # 低于管理器要求的 34634，所以必须取回子模块完整历史。
-      - name: Unshallow ReSukiSU submodule
+      - name: Unshallow BakaSU submodule
         run: |
-          git -C ReSukiSU fetch --unshallow origin || true
-          echo "ReSukiSU commit count: $(git -C ReSukiSU rev-list --count HEAD)"
+          git -C BakaSU fetch --unshallow origin || true
+          echo "BakaSU commit count: $(git -C BakaSU rev-list --count HEAD)"
 
       - name: Install toolchain
         run: |
@@ -38,7 +38,7 @@ jobs:
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
 
       - name: Build kernel
-        run: ./build-resukisu.sh
+        run: ./build-bakasu.sh
 
       - name: Package AnyKernel3 (chiron)
         run: ./package-ak3.sh -D chiron
@@ -54,11 +54,11 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: resukisu-${{ github.ref_name }}
+          name: bakasu-${{ github.ref_name }}
           path: |
-            Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip
-            Sagit-ReSukiSU-Lineage22.2-AnyKernel3.zip
+            Chiron-BakaSU-Lineage22.2-AnyKernel3.zip
+            Sagit-BakaSU-Lineage22.2-AnyKernel3.zip
             out/arch/arm64/boot/Image.gz-dtb
-            build-resukisu.log
+            build-bakasu.log
           if-no-files-found: error
           retention-days: 30

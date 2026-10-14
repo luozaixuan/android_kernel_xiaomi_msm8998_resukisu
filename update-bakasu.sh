@@ -1,8 +1,8 @@
 #!/bin/sh
-# Update ReSukiSU to the latest main branch, rebuild and (optionally) repackage.
+# Update BakaSU to the latest main branch, rebuild and (optionally) repackage.
 #
 # Usage:
-#   ./update-resukisu.sh [options]
+#   ./update-bakasu.sh [options]
 #
 # Options:
 #   -y, --yes          Skip the confirmation when kernel/ changes are detected
@@ -10,16 +10,16 @@
 #   --no-commit        Do not commit the submodule pointer
 #   -j, --jobs N       Build parallelism (default: nproc)
 #   --ak3 DIR          Path to an AnyKernel3 template; if given, the new
-#                      Image.gz-dtb is packaged into Chiron-ReSukiSU-...zip
+#                      Image.gz-dtb is packaged into Chiron-BakaSU-...zip
 #   -h, --help         Show this help
 #
 set -eu
 
 REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-SUBMODULE="$REPO_DIR/ReSukiSU"
-ZIP_NAME="Chiron-ReSukiSU-Lineage22.2-AnyKernel3.zip"
+SUBMODULE="$REPO_DIR/BakaSU"
+ZIP_NAME="Chiron-BakaSU-Lineage22.2-AnyKernel3.zip"
 MIN_VERSION=34634
-LOG="$REPO_DIR/build-resukisu.log"
+LOG="$REPO_DIR/build-bakasu.log"
 
 FORCE=0
 NO_BUILD=0
@@ -51,12 +51,12 @@ cd "$REPO_DIR"
 # 1. Prepare submodule
 # ---------------------------------------------------------------------------
 if ! git submodule status "$SUBMODULE" >/dev/null 2>&1; then
-    echo "[1/6] initializing ReSukiSU submodule"
-    git submodule update --init --recursive ReSukiSU
+    echo "[1/6] initializing BakaSU submodule"
+    git submodule update --init --recursive BakaSU
 fi
 
 if [ -n "$(git -C "$SUBMODULE" status --porcelain)" ]; then
-    echo "ERROR: ReSukiSU submodule has local modifications; refusing to overwrite." >&2
+    echo "ERROR: BakaSU submodule has local modifications; refusing to overwrite." >&2
     echo "       Stash/commit them first, then rerun." >&2
     exit 1
 fi
@@ -66,9 +66,9 @@ OLD="$(git -C "$SUBMODULE" rev-parse HEAD)"
 # ---------------------------------------------------------------------------
 # 2. Fetch latest main
 # ---------------------------------------------------------------------------
-echo "[1/6] fetching ReSukiSU origin/main"
-git -C "$SUBMODULE" fetch origin main
-git -C "$SUBMODULE" checkout -q origin/main
+echo "[1/6] fetching BakaSU origin/sync-susfs"
+git -C "$SUBMODULE" fetch origin sync-susfs
+git -C "$SUBMODULE" checkout -q origin/sync-susfs
 NEW="$(git -C "$SUBMODULE" rev-parse HEAD)"
 
 if [ "$OLD" = "$NEW" ]; then
@@ -97,7 +97,7 @@ if [ -n "$KERNEL_CHANGES" ]; then
     echo "  - check kernel/tools/manual_hook_check.mk (Manual Hook mode)"
     echo "  - check kernel/tools/inline_hook_check.mk + susfs_compat.mk (SusFS mode)"
     echo "  - check kernel/Kconfig for new options"
-    echo "  - docs: https://resukisu.github.io/guide/manual-integrate.html"
+    echo "  - docs: https://bakasu.org/guide/manual-integrate.html"
     if [ "$FORCE" -ne 1 ]; then
         printf "Continue anyway? [y/N] "
         read -r ans
@@ -117,7 +117,7 @@ fi
 COUNT="$(git -C "$SUBMODULE" rev-list --count HEAD)"
 VERSION="$((30000 + COUNT + 700))"
 echo
-echo "[2/6] ReSukiSU version code: $VERSION (commit count: $COUNT)"
+echo "[2/6] BakaSU version code: $VERSION (commit count: $COUNT)"
 if [ "$VERSION" -lt "$MIN_VERSION" ]; then
     echo "ERROR: version code below $MIN_VERSION. The submodule is probably a shallow clone." >&2
     echo "       Remove it and add it again without --depth." >&2
@@ -128,10 +128,10 @@ fi
 # 5. Commit submodule pointer
 # ---------------------------------------------------------------------------
 if [ "$NO_COMMIT" -ne 1 ]; then
-    git add ReSukiSU
+    git add BakaSU
     if ! git diff --cached --quiet; then
         DESCR="$(git -C "$SUBMODULE" describe --tags --always --dirty=-dirty)"
-        git commit -m "ReSukiSU: update submodule to $DESCR"
+        git commit -m "BakaSU: update submodule to $DESCR"
         echo "[3/6] submodule pointer committed as $DESCR"
     else
         echo "[3/6] no submodule pointer change to commit"
@@ -154,7 +154,7 @@ else
 
     echo "[5/6] building kernel (-j$JOBS)"
     make O=out -j"$JOBS" Image.gz-dtb modules 2>&1 | tee "$LOG"
-    grep -E 'ReSukiSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG" || true
+    grep -E 'BakaSU version code|using (Manual Hook|SuSFS Inline hook)|manual_hook:|susfs_inline:|SUSFS_VERSION' "$LOG" || true
 fi
 
 IMAGE="$REPO_DIR/out/arch/arm64/boot/Image.gz-dtb"
@@ -180,7 +180,7 @@ if [ -n "$AK3_DIR" ]; then
     echo "[package] copying kernel into AnyKernel3 template: $AK3_DIR"
     cp -f "$IMAGE" "$AK3_DIR/Image.gz-dtb"
     SHORT="$(git -C "$SUBMODULE" rev-parse --short=8 HEAD)"
-    sed -i "s|^kernel.string=.*|kernel.string=Chiron-ReSukiSU ${SHORT} (${VERSION}) 4.4.302-perf-resukisu for LineageOS 22.2|" \
+    sed -i "s|^kernel.string=.*|kernel.string=Chiron-BakaSU ${SHORT} (${VERSION}) 4.4.302-perf-bakasu for LineageOS 22.2|" \
         "$AK3_DIR/anykernel.sh"
     python3 - "$AK3_DIR" "$REPO_DIR/$ZIP_NAME" <<'PY'
 import os, sys, zipfile

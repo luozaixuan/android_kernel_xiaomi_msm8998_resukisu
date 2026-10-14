@@ -1,9 +1,9 @@
 ### AnyKernel3 Ramdisk Mod Script
-## chiron (Xiaomi Mi MIX 2) - LineageOS 22.2 + ReSukiSU
+## chiron (Xiaomi Mi MIX 2) - LineageOS 22.2 + BakaSU
 
 ### AnyKernel setup
 properties() { '
-kernel.string=Chiron-ReSukiSU 0b5efe9e (35114) 4.4.302-perf-resukisu for LineageOS 22.2
+kernel.string=Chiron-BakaSU 0b5efe9e (35114) 4.4.302-perf-bakasu for LineageOS 22.2
 do.devicecheck=1
 do.modules=0
 do.systemless=0
